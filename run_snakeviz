@@ -1,0 +1,2 @@
+python -m cProfile -o program.prof run_DMRG_Heisenberg.py
+snakeviz program.prof

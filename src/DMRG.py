@@ -1,6 +1,112 @@
+### Modified from A. Feiguin's notebook, found at https://github.com/afeiguin/comp-phys/blob/master/13_01_DMRG.ipynb
+
+#TODO Tidy up the Lanczos algorithm
+#TODO Use Numba
+#TODO Add more Hamiltonians
+
 import numpy as np
 from src.Hamiltonians import Hamiltonians
+from tqdm import tqdm
 
+def psi_dot_psi(psi1, psi2):
+    x = 0.
+    for i in range(psi1.shape[0]):
+        for j in range(psi2.shape[1]):
+            x += psi1[i, j] * psi2[i, j]
+    return x
+
+
+def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
+    x1 = seed
+    x2 = seed
+    gs = seed
+    a = np.zeros(100)
+    b = np.zeros(100)
+    z = np.zeros((100, 100))
+    lvectors = []
+    control_max = maxiter;
+    e0 = 9999
+
+    if (maxiter == -1):
+        force_maxiter = False
+
+    if (control_max == 0):
+        gs = 1
+        maxiter = 1
+        return (e0, gs)
+
+    x1[:, :] = 0
+    x2[:, :] = 0
+    gs[:, :] = 0
+    a[:] = 0.0
+    b[:] = 0.0
+    if (use_seed):
+        x1 = seed
+    else:
+        for i in range(x1.shape[0]):
+            for j in range(x1.shape[1]):
+                x1[i, j] = (2 * np.random.random() - 1.)
+
+    #    x1[:,:] = 1
+    b[0] = psi_dot_psi(x1, x1)
+    b[0] = np.sqrt(b[0])
+    x1 = x1 / b[0]
+    x2[:] = 0
+    b[0] = 1.
+
+    e0 = 9999
+    nmax = min(99, maxiter)
+
+    for iter in range(1, nmax + 1):
+        eini = e0
+        if (b[iter - 1] != 0.):
+            aux = x1
+            x1 = -b[iter - 1] * x2
+            x2 = aux / b[iter - 1]
+
+        aux = m.product(x2)
+
+        x1 = x1 + aux
+        a[iter] = psi_dot_psi(x1, x2)
+        x1 = x1 - x2 * a[iter]
+
+        b[iter] = psi_dot_psi(x1, x1)
+        b[iter] = np.sqrt(b[iter])
+        lvectors.append(x2)
+        #        print "Iter =",iter,a[iter],b[iter]
+        z.resize((iter, iter), refcheck=False)
+        z[:, :] = 0
+        for i in range(0, iter - 1):
+            z[i, i + 1] = b[i + 1]
+            z[i + 1, i] = b[i + 1]
+            z[i, i] = a[i + 1]
+        z[iter - 1, iter - 1] = a[iter]
+        d, v = np.linalg.eig(z)
+
+        col = 0
+        n = 0
+        e0 = 9999
+        for e in d:
+            if (e < e0):
+                e0 = e
+                col = n
+            n += 1
+        e0 = d[col]
+
+        # print("Iter = ",iter," Ener = ",e0)
+        if ((force_maxiter and iter >= control_max) or (
+                iter >= gs.shape[0] * gs.shape[1] or iter == 99 or abs(b[iter]) < tol) or \
+                ((not force_maxiter) and abs(eini - e0) <= tol)):
+            # converged
+            gs[:, :] = 0.
+            for n in range(0, iter):
+                gs += v[n, col] * lvectors[n]
+
+            # print("E0 = ", e0)
+            maxiter = iter
+            return (e0, gs)  # We return with ground states energy
+
+    return (e0, gs)
 
 class DMRGHamiltonians(Hamiltonians):
     def __init__(self):
@@ -28,9 +134,11 @@ class Position:
 
 class DMRG(object):
 
-    def __init__(self, _nsites):
+    def __init__(self, _nsites, _nsweeps, _n_states_to_keep):
 
         self.nsites = _nsites
+        self.n_sweeps = _nsweeps
+        self.n_states_to_keep = _n_states_to_keep
         self.nstates = 2
         self.dim_l = 0  # dimension of left block
         self.dim_r = 0  # dimension of right block
@@ -85,10 +193,10 @@ class DMRG(object):
     def ground_state(self):
         self.dim_l = self.HL[self.left_size].shape[0]
         self.dim_r = self.HR[self.right_size].shape[0]
-        self.psi.resize((self.dim_l, self.dim_r))
-        # maxit = self.dim_l*self.dim_r
-        # (self.energy, self.psi) = lanczos(self.psi, maxit, 1e-7)
-        (self.energy, self.psi) = np.linalg.eigh(self.psi)
+        self.psi.resize((self.dim_l, self.dim_r), refcheck=False)
+        maxiter = self.dim_l*self.dim_r
+        (self.energy, self.psi) = lanczos(self, self.psi, maxiter, 1.e-7)
+        # (self.energy, self.psi) = np.linalg.eigh(self.psi)
 
     def density_matrix(self, position):
         if position == Position.LEFT:
@@ -116,7 +224,7 @@ class DMRG(object):
 
         aux = np.copy(rho_evec)
         if (self.rho.shape[0] > m):
-            aux.resize((aux.shape[0], m))
+            aux.resize((aux.shape[0], m), refcheck=False)
             n = 0
             for i in range(index.shape[0] - 1, index.shape[0] - 1 - m, -1):
                 aux[:, n] = rho_evec[:, index[i]]
@@ -157,3 +265,56 @@ class DMRG(object):
         npsi += np.dot(self.splusL[self.left_size].transpose(), tmat)
 
         return npsi
+
+    def _infinite_dmrg(self):
+        for i in tqdm(range(1, self.n_sweeps)):
+            for iter in range(1, int(self.nsites / 2)):  # do infinite size dmrg for warmup
+                # print("WARMUP ITERATION ", iter, S.dim_l, S.dim_r)
+                # Create HL and HR by adding the single sites to the two blocks
+                self.build_block_left(iter)
+                self.build_block_right(iter)
+
+                # find smallest eigenvalue and eigenvector
+                self.ground_state()
+
+                # Calculate density matrix
+                self.density_matrix(Position.LEFT)
+
+                # Truncate
+                self.truncate(Position.LEFT, self.n_states_to_keep)
+
+                # Reflect
+                self.density_matrix(Position.RIGHT)
+                self.truncate(Position.RIGHT, self.n_states_to_keep)
+    def _finite_dmrg(self):
+        first_iter = int(self.nsites / 2)
+        for i in tqdm(range(1, self.n_sweeps)):
+            for sweep in range(1, self.n_sweeps):
+                for iter in range(first_iter, self.nsites - 3):
+                    # print("LEFT-TO-RIGHT ITERATION ", iter, S.dim_l, S.dim_r)
+                    # Create HL and HR by adding the single sites to the two blocks
+                    self.build_block_left(iter)
+                    self.build_block_right(self.nsites - iter - 2)
+                    # find smallest eigenvalue and eigenvector
+                    self.ground_state()
+                    # Calculate density matrix
+                    self.density_matrix(Position.LEFT)
+                    # Truncate
+                    self.truncate(Position.LEFT, self.n_states_to_keep)
+                first_iter = 1;
+                for iter in range(first_iter, self.nsites - 3):
+                    # print("RIGHT-TO-LEFT ITERATION ", iter, S.dim_l, S.dim_r)
+                    # Create HL and HR by adding the single sites to the two blocks
+                    self.build_block_right(iter);
+                    self.build_block_left(self.nsites - iter - 2)
+                    # find smallest eigenvalue and eigenvector
+                    self.ground_state();
+                    # Calculate density matrix
+                    self.density_matrix(Position.RIGHT)
+                    # Truncate
+                    self.truncate(Position.RIGHT, self.n_states_to_keep)
+
+    def get_density(self):
+        self._infinite_dmrg()
+        self._finite_dmrg()
+        return self.rho
