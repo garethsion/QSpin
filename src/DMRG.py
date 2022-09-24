@@ -7,6 +7,8 @@
 import numpy as np
 from src.Hamiltonians import Hamiltonians
 from tqdm import tqdm
+from numba import jit
+
 
 def psi_dot_psi(psi1, psi2):
     x = 0.
@@ -14,7 +16,6 @@ def psi_dot_psi(psi1, psi2):
         for j in range(psi2.shape[1]):
             x += psi1[i, j] * psi2[i, j]
     return x
-
 
 def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
     x1 = seed
@@ -286,6 +287,7 @@ class DMRG(object):
                 # Reflect
                 self.density_matrix(Position.RIGHT)
                 self.truncate(Position.RIGHT, self.n_states_to_keep)
+
     def _finite_dmrg(self):
         first_iter = int(self.nsites / 2)
         for i in tqdm(range(1, self.n_sweeps)):
@@ -314,6 +316,7 @@ class DMRG(object):
                     # Truncate
                     self.truncate(Position.RIGHT, self.n_states_to_keep)
 
+    # @jit(forceobj=True)
     def get_density(self):
         self._infinite_dmrg()
         self._finite_dmrg()
