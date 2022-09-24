@@ -130,20 +130,28 @@ def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
 class DMRGHamiltonians(Hamiltonians):
     def __init__(self):
         super().__init__()
-        self.sz = np.matrix(self.sz.toarray())
-        self.splus = np.matrix(self.splus.toarray())
+        # self.sz = np.matrix(self.sz.toarray())
+        # self.splus = np.matrix(self.splus.toarray())
 
     def heisenberg_interaction(self, H, side='left', size=0, dim=0, splusRL=0, szRL=0):
         if side == 'left':
-            H[size] = np.kron(H[size - 1], np.eye(2)) + \
-                      np.kron(szRL[size - 1], self.sz) + \
-                      0.5 * np.kron(splusRL[size - 1], self.splus.transpose()) + \
-                      0.5 * np.kron(splusRL[size - 1].transpose(), self.splus)
+            # H[size] = np.kron(H[size - 1], np.eye(2)) + \
+            #           np.kron(szRL[size - 1], self.sz) + \
+            #           0.5 * np.kron(splusRL[size - 1], self.splus.transpose()) + \
+            #           0.5 * np.kron(splusRL[size - 1].transpose(), self.splus)
+            H[size] = kron(H[size - 1], eye(2)) + \
+                      kron(szRL[size - 1], self.sz) + \
+                      0.5 * kron(splusRL[size - 1], self.splus.transpose()) + \
+                      0.5 * kron(splusRL[size - 1].transpose(), self.splus)
         elif side == 'right':
-            H[size] = np.kron(np.eye(2), H[size - 1]) + \
-                      np.kron(self.sz, szRL[size - 1]) + \
-                      0.5 * np.kron(self.splus.transpose(), splusRL[size - 1]) + \
-                      0.5 * np.kron(self.splus, splusRL[size - 1].transpose())
+            # H[size] = np.kron(np.eye(2), H[size - 1]) + \
+            #           np.kron(self.sz, szRL[size - 1]) + \
+            #           0.5 * np.kron(self.splus.transpose(), splusRL[size - 1]) + \
+            #           0.5 * np.kron(self.splus, splusRL[size - 1].transpose())
+            H[size] = kron(eye(2), H[size - 1]) + \
+                      kron(self.sz, szRL[size - 1]) + \
+                      0.5 * kron(self.splus.transpose(), splusRL[size - 1]) + \
+                      0.5 * kron(self.splus, splusRL[size - 1].transpose())
         return H[size]
 
 
@@ -164,8 +172,15 @@ class DMRG(object):
         self.left_size = 0  # number of sites in left block
         self.right_size = 0  # number of sites in right block
 
-        self.sz0 = .5 * np.matrix('-1,0;0,1')
-        self.splus0 = np.matrix('0,1;0,0')
+        # self.sz0 = .5 * np.matrix('-1,0;0,1')
+        # self.splus0 = np.matrix('0,1;0,0')
+
+        self.sx0 = csr_matrix((np.matrix('0 1; 1 0')), dtype=float)
+        self.sy0 = csr_matrix((np.matrix('0 -1j; 1j 0')), dtype=float)
+        self.sz0 = csr_matrix((np.matrix('1 0; 0 -1')), dtype=float)
+
+        self.sminus0 = .5 * (self.sx0 - self.sy0)
+        self.splus0 = .5 * (self.sx0 + self.sy0)
 
         self.HL = []  # left block Hamiltonian
         self.HR = []  # right block Hamiltonian
@@ -175,15 +190,17 @@ class DMRG(object):
         self.splusR = []  # right block S+
 
         for i in range(self.nsites):
-            self.HL.append(np.zeros(shape=(2, 2)))
-            self.HR.append(np.zeros(shape=(2, 2)))
+            # self.HL.append(np.zeros(shape=(2, 2)))
+            # self.HR.append(np.zeros(shape=(2, 2)))
+            self.HL.append(csr_matrix((2, 2), dtype=np.float))
+            self.HR.append(csr_matrix((2, 2), dtype=np.float))
             self.szL.append(self.sz0)
             self.szR.append(self.sz0)
             self.splusL.append(self.splus0)
             self.splusR.append(self.splus0)
 
-        self.psi = np.zeros((2, 2), dtype=np.float)  # ground state wave function
-        self.rho = np.zeros((2, 2), dtype=np.float)  # density matrix
+        self.psi = csr_matrix((2, 2), dtype=np.float)  # ground state wave function
+        self.rho = csr_matrix((2, 2), dtype=np.float)  # density matrix
 
         self.energy = 0
         self.error = 0
@@ -198,8 +215,10 @@ class DMRG(object):
         self.HL[self.left_size] = ham.heisenberg_interaction(self.HL, side='left', size=self.left_size,
                                                              dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
 
-        self.splusL[self.left_size] = np.kron(np.eye(self.dim_l), self.splus0)
-        self.szL[self.left_size] = np.kron(np.eye(self.dim_l), self.sz0)
+        # self.splusL[self.left_size] = np.kron(np.eye(self.dim_l), self.splus0)
+        # self.szL[self.left_size] = np.kron(np.eye(self.dim_l), self.sz0)
+        self.splusL[self.left_size] = kron(eye(self.dim_l), self.splus0)
+        self.szL[self.left_size] = kron(eye(self.dim_l), self.sz0)
 
     def build_block_right(self, it):
         self.right_size = it
@@ -207,9 +226,12 @@ class DMRG(object):
         ham = DMRGHamiltonians()
         self.HR[self.right_size] = ham.heisenberg_interaction(self.HR, side='right', size=self.right_size,
                                                              dim=self.dim_r, splusRL=self.splusR, szRL=self.szR)
-        self.splusR[self.right_size] = np.kron(self.splus0, np.eye(self.dim_r))
-        self.szR[self.right_size] = np.kron(self.sz0, np.eye(self.dim_r))
+        # self.splusR[self.right_size] = np.kron(self.splus0, np.eye(self.dim_r))
+        # self.szR[self.right_size] = np.kron(self.sz0, np.eye(self.dim_r))
+        self.splusR[self.right_size] = kron(self.splus0, eye(self.dim_r))
+        self.szR[self.right_size] = kron(self.sz0, eye(self.dim_r))
 
+    @timeit
     def ground_state(self):
         self.dim_l = self.HL[self.left_size].shape[0]
         self.dim_r = self.HR[self.right_size].shape[0]
@@ -220,13 +242,13 @@ class DMRG(object):
 
     def density_matrix(self, position):
         if position == Position.LEFT:
-            self.rho = np.dot(self.psi, self.psi.transpose())
+            self.rho = self.psi.dot(self.psi.transpose())
         else:
-            self.rho = np.dot(self.psi.transpose(), self.psi)
+            self.rho = self.psi.transpose().dot(self.psi)
 
     def truncate(self, position, m):
         # diagonalize rho
-        rho_eig, rho_evec = scipy.sparse.linalg.eigsh(self.rho)
+        rho_eig, rho_evec = scipy.sparse.linalg.eigsh(self.rho.toarray())
         self.nstates = m
         rho_evec = np.real(rho_evec)
         rho_eig = np.real(rho_eig)
@@ -256,33 +278,33 @@ class DMRG(object):
         # perform transformation:
         U = rho_evec.transpose()
         if (position == Position.LEFT):
-            aux2 = np.dot(self.HL[self.left_size], rho_evec)
+            aux2 = self.HL[self.left_size].dot(rho_evec)
             self.HL[self.left_size] = np.dot(U, aux2)
-            aux2 = np.dot(self.splusL[self.left_size], rho_evec)
+            aux2 = self.splusL[self.left_size].dot(rho_evec)
             self.splusL[self.left_size] = np.dot(U, aux2)
-            aux2 = np.dot(self.szL[self.left_size], rho_evec)
+            aux2 = self.szL[self.left_size].dot(rho_evec)
             self.szL[self.left_size] = np.dot(U, aux2)
         else:
-            aux2 = np.dot(self.HR[self.right_size], rho_evec)
+            aux2 = self.HR[self.right_size].dot(rho_evec)
             self.HR[self.right_size] = np.dot(U, aux2)
-            aux2 = np.dot(self.splusR[self.right_size], rho_evec)
+            aux2 = self.splusR[self.right_size].dot(rho_evec)
             self.splusR[self.right_size] = np.dot(U, aux2)
-            aux2 = np.dot(self.szR[self.right_size], rho_evec)
+            aux2 = self.szR[self.right_size].dot(rho_evec)
             self.szR[self.right_size] = np.dot(U, aux2)
 
     def product(self, psi):
-        npsi = np.dot(self.HL[self.left_size], psi)
-        npsi += np.dot(psi, self.HR[self.right_size].transpose())
+        npsi = self.HL[self.left_size].dot(psi)
+        npsi += psi.dot(self.HR[self.right_size].transpose())
 
         # Sz.Sz
-        tmat = np.dot(psi, self.szR[self.right_size].transpose())
-        npsi += np.dot(self.szL[self.left_size], tmat)
+        tmat = psi.dot(self.szR[self.right_size].transpose())
+        npsi += self.szL[self.left_size].dot(tmat)
         # S+.S-
-        tmat = np.dot(psi, self.splusR[self.right_size]) * 0.5
-        npsi += np.dot(self.splusL[self.left_size], tmat)
+        tmat = psi.dot(self.splusR[self.right_size]) * 0.5
+        npsi += self.splusL[self.left_size].dot(tmat)
         # S-.S+
-        tmat = np.dot(psi, self.splusR[self.right_size].transpose()) * 0.5
-        npsi += np.dot(self.splusL[self.left_size].transpose(), tmat)
+        tmat = psi.dot(self.splusR[self.right_size].transpose()) * 0.5
+        npsi += self.splusL[self.left_size].transpose().dot(tmat)
 
         return npsi
 

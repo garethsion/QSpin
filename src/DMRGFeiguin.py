@@ -1,3 +1,17 @@
+from functools import wraps
+import time
+
+
+def timeit(func):
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        print(f'Function {func.__name__}{args} {kwargs} Took {total_time:.4f} seconds')
+        return result
+    return timeit_wrapper
 def psi_dot_psi(psi1, psi2):
     x = 0.
     for i in range(psi1.shape[0]):
@@ -64,7 +78,7 @@ def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
         b[iter] = np.sqrt(b[iter])
         lvectors.append(x2)
         #        print "Iter =",iter,a[iter],b[iter]
-        z.resize((iter, iter))
+        z.resize((iter, iter), refcheck=False)
         z[:, :] = 0
         for i in range(0, iter - 1):
             z[i, i + 1] = b[i + 1]
@@ -176,10 +190,11 @@ class DMRGSystem(object):
         self.splusR[self.right_size] = np.kron(self.splus0, I_right)
         self.szR[self.right_size] = np.kron(self.sz0, I_right)
 
+    @timeit
     def GroundState(self):
         self.dim_l = self.HL[self.left_size].shape[0]
         self.dim_r = self.HR[self.right_size].shape[0]
-        self.psi.resize((self.dim_l, self.dim_r))
+        self.psi.resize((self.dim_l, self.dim_r), refcheck=False)
         maxiter = self.dim_l * self.dim_r
 
         (self.energy, self.psi) = lanczos(self, self.psi, maxiter, 1.e-7)
@@ -212,7 +227,7 @@ class DMRGSystem(object):
 
         aux = np.copy(rho_evec)
         if (self.rho.shape[0] > m):
-            aux.resize((aux.shape[0], m))
+            aux.resize((aux.shape[0], m), refcheck=False)
             n = 0
             for i in range(index.shape[0] - 1, index.shape[0] - 1 - m, -1):
                 aux[:, n] = rho_evec[:, index[i]]

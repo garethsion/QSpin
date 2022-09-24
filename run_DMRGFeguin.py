@@ -2,8 +2,8 @@ from src.DMRGFeiguin import DMRGSystem, Position
 
 
 def run():
-    nsites = 4
-    n_states_to_keep = 4
+    nsites = 10
+    n_states_to_keep = 10
     n_sweeps = 4
     S = DMRGSystem(nsites)
     ###############################################################################

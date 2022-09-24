@@ -4,12 +4,12 @@ from src.DMRG import Position, DMRG
 
 
 def run_dmrg_heisenberg():
-    nsites = 4
+    nsites = 10
     n_states_to_keep = 10
     n_sweeps = 6
     S = DMRG(nsites, n_sweeps, n_states_to_keep)
     rho = S.get_density()
-    print(rho.toarray())
+    print(rho)
 
 
 if __name__ == '__main__':
