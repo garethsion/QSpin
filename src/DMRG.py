@@ -12,7 +12,8 @@ from src.Hamiltonians import Hamiltonians
 from tqdm import tqdm
 from numba import jit
 import cython
-
+# from src.lanczos import lanczos
+from c_lanczos import lanczos
 from functools import wraps
 import time
 
@@ -28,105 +29,99 @@ def timeit(func):
         return result
     return timeit_wrapper
 
-def lanczos(m=None, seed=None, maxiter=1000, tol=1, use_seed=False, force_maxiter=False):
-    '''
+# def lanczos(m=None, seed=None, maxiter=1000, tol=1, use_seed=False, force_maxiter=False):
+#     '''
 
-    :param m: object of DMRG class
-    :param seed: seed state (np.ndarray)
-    :param maxiter: max number of iterations (int)
-    :param tol:
-    :param use_seed:
-    :param force_maxiter:
-    :return:
-    '''
-    x1 = seed
-    x2 = seed
-    gs = seed
-    a = np.zeros(100)
-    b = np.zeros(100)
-    z = np.zeros((100, 100))
-    lvectors = []
-    control_max = maxiter;
-    e0 = 9999
+#     :param m: object of DMRG class
+#     :param seed: seed state (np.ndarray)
+#     :param maxiter: max number of iterations (int)
+#     :param tol:
+#     :param use_seed:
+#     :param force_maxiter:
+#     :return:
+#     '''
+#     x1 = seed
+#     x2 = seed
+#     gs = seed
+#     a = np.zeros(100)
+#     b = np.zeros(100)
+#     z = np.zeros((100, 100))
+#     lvectors = []
+#     control_max = maxiter
+#     e0 = 9999
 
-    if (maxiter == -1):
-        force_maxiter = False
+#     if (maxiter == -1):
+#         force_maxiter = False
 
-    if (control_max == 0):
-        gs = 1
-        maxiter = 1
-        return (e0, gs)
+#     if (control_max == 0):
+#         gs = 1
+#         maxiter = 1
+#         return (e0, gs)
 
-    if (use_seed):
-        x1 = seed
-    else:
-        x1 = np.array([[(2 * np.random.random() - 1.) for j in range(x1.shape[1])] for j in range(x1.shape[0])])
+#     if (use_seed):
+#         x1 = seed
+#     else:
+#         x1 = np.array([[(2 * np.random.random() - 1.) for j in range(x1.shape[1])] for j in range(x1.shape[0])])
 
-    #    x1[:,:] = 1
-    b[0] = np.sqrt(np.tensordot(x1,x1))
-    # b[0] = np.sqrt(b[0])
-    x1 = x1 / b[0]
-    # x2[:] = 0
-    b[0] = 1.
+#     b[0] = np.sqrt(np.tensordot(x1,x1))
+#     x1 = x1 / b[0]
+#     b[0] = 1.
 
-    e0 = 9999
-    nmax = min(99, maxiter)
+#     e0 = 9999
+#     nmax = min(99, maxiter)
 
-    for iter in range(1, nmax + 1):
-        eini = e0
-        if (b[iter - 1] != 0.):
-            aux = x1
-            x1 = -b[iter - 1] * x2
-            x2 = aux / b[iter - 1]
+#     for iter in range(1, nmax + 1):
+#         eini = e0
+#         if (b[iter - 1] != 0.):
+#             aux = x1
+#             x1 = -b[iter - 1] * x2
+#             x2 = aux / b[iter - 1]
 
-        aux = m.product(x2)
+#         aux = m.product(x2)
 
-        x1 = x1 + aux
-        x1 = np.real(x1)
-        x2 = np.real(x2)
-        # a[iter] = np.matrix(x1*x2).sum()
-        a[iter] = np.tensordot(x1,x2)
-        x1 = x1 - x2 * a[iter]
+#         x1 = x1 + aux
+#         x1 = np.real(x1)
+#         x2 = np.real(x2)
+#         a[iter] = np.tensordot(x1,x2)
+#         x1 = x1 - x2 * a[iter]
 
-        # b[iter] = np.matrix(x1**2).sum()
-        # b[iter] = np.sqrt(b[iter])
-        b[iter] = np.tensordot(x1, x1)
-        lvectors.append(x2)
-        #        print "Iter =",iter,a[iter],b[iter]
-        z.resize((iter, iter), refcheck=False)  # Redeclare this as z = np.zeros((iter, iter), dtype=float)
-        z[:, :] = 0
-        for i in range(0, iter - 1):
-            z[i, i + 1] = b[i + 1]
-            z[i + 1, i] = b[i + 1]
-            z[i, i] = a[i + 1]
-        z[iter - 1, iter - 1] = a[iter]
-        d, v = np.linalg.eig(z)
+#         b[iter] = np.tensordot(x1, x1)
+#         lvectors.append(x2)
+#         #        print "Iter =",iter,a[iter],b[iter]
+#         z.resize((iter, iter), refcheck=False)  # Redeclare this as z = np.zeros((iter, iter), dtype=float)
+#         # z = np.zeros((iter, iter), dtype=float)
+#         # z[:, :] = 0
+#         for i in range(0, iter - 1):
+#             z[i, i + 1] = b[i + 1]
+#             z[i + 1, i] = b[i + 1]
+#             z[i, i] = a[i + 1]
+#         z[iter - 1, iter - 1] = a[iter]
+#         d, v = np.linalg.eig(z)
 
-        col = 0
-        n = 0
-        e0 = 9999
-        for e in d:
-            if (e < e0):
-                e0 = e
-                col = n
-            n += 1
-        e0 = d[col]
+#         col = 0
+#         n = 0
+#         e0 = 9999
+#         for e in d:
+#             if (e < e0):
+#                 e0 = e
+#                 col = n
+#             n += 1
+#         e0 = d[col]
 
-        # print("Iter = ",iter," Ener = ",e0)
-        if ((force_maxiter and iter >= control_max) or (
-                iter >= gs.shape[0] * gs.shape[1] or iter == 99 or abs(b[iter]) < tol) or \
-                ((not force_maxiter) and abs(eini - e0) <= tol)):
-            # converged
-            gs[:, :] = 0.
-            # gs += [v[nn, col] * lvectors[n] for nn in range(0, iter)]
-            for n in range(0, iter):
-                # gs += v[n, col] * lvectors[n]
-                gs = np.add(gs, v[n, col]*lvectors[n], casting="unsafe")
-            # print("E0 = ", e0)
-            maxiter = iter
-            return (e0, gs)  # We return with ground states energy
+#         # print("Iter = ",iter," Ener = ",e0)
+#         if ((force_maxiter and iter >= control_max) or (
+#                 iter >= gs.shape[0] * gs.shape[1] or iter == 99 or abs(b[iter]) < tol) or \
+#                 ((not force_maxiter) and abs(eini - e0) <= tol)):
+#             # converged
+#             gs[:, :] = 0.
+#             # gs += [v[nn, col] * lvectors[n] for nn in range(0, iter)]
+#             for n in range(0, iter):
+#                 gs = np.add(gs, v[n, col]*lvectors[n], casting="unsafe")
+#             # print("E0 = ", e0)
+#             maxiter = iter
+#             return (e0, gs)  # We return with ground states energy
 
-    return (e0, gs)
+#     return (e0, gs)
 
 class DMRGHamiltonians(Hamiltonians):
     def __init__(self):

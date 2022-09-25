@@ -1,4 +1,10 @@
+import numpy as np
 from distutils.core import setup
 from Cython.Build import cythonize
 
-setup(ext_modules = cythonize('test_cython.pyx'))
+setup(
+    name="Quantum Spin",
+    ext_modules=cythonize('c_lanczos.pyx'),
+    include_dirs=[np.get_include()],
+    zip_safe=False
+)
