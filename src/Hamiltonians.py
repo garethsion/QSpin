@@ -1,5 +1,5 @@
-# from src.Fermionisation import JordanWigner
-from Fermionisation import JordanWigner
+from src.Fermionisation import JordanWigner
+# from Fermionisation import JordanWigner
 
 import numpy as np
 from scipy.sparse import csr_matrix, eye, kron

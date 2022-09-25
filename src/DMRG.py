@@ -28,14 +28,6 @@ def timeit(func):
         return result
     return timeit_wrapper
 
-
-def psi_dot_psi(psi1, psi2):
-    x = 0.
-    for i in range(psi1.shape[0]):
-        for j in range(psi2.shape[1]):
-            x += psi1[i, j] * psi2[i, j]
-    return x
-
 def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
     x1 = seed
     x2 = seed
@@ -55,11 +47,6 @@ def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
         maxiter = 1
         return (e0, gs)
 
-    x1[:, :] = 0
-    x2[:, :] = 0
-    gs[:, :] = 0
-    a[:] = 0.0
-    b[:] = 0.0
     if (use_seed):
         x1 = seed
     else:
@@ -68,7 +55,7 @@ def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
                 x1[i, j] = (2 * np.random.random() - 1.)
 
     #    x1[:,:] = 1
-    b[0] = psi_dot_psi(x1, x1)
+    b[0] = np.matrix(x1**2).sum()
     b[0] = np.sqrt(b[0])
     x1 = x1 / b[0]
     x2[:] = 0
@@ -87,10 +74,10 @@ def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
         aux = m.product(x2)
 
         x1 = x1 + aux
-        a[iter] = psi_dot_psi(x1, x2)
+        a[iter] = np.matrix(x1**x2).sum()
         x1 = x1 - x2 * a[iter]
 
-        b[iter] = psi_dot_psi(x1, x1)
+        b[iter] = np.matrix(x1**2).sum()
         b[iter] = np.sqrt(b[iter])
         lvectors.append(x2)
         #        print "Iter =",iter,a[iter],b[iter]
@@ -214,7 +201,7 @@ class DMRG(object):
     def ground_state(self):
         self.dim_l = self.HL[self.left_size].shape[0]
         self.dim_r = self.HR[self.right_size].shape[0]
-        self.psi.resize((self.dim_l, self.dim_r))
+        self.psi.resize((self.dim_l, self.dim_r), refcheck=False)
         maxiter = self.dim_l*self.dim_r
         (self.energy, self.psi) = lanczos(self, self.psi, maxiter, 1.e-7)
         # (self.energy, self.psi) = np.linalg.eigh(self.psi)
