@@ -28,7 +28,17 @@ def timeit(func):
         return result
     return timeit_wrapper
 
-def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
+def lanczos(m=None, seed=None, maxiter=1000, tol=1, use_seed=False, force_maxiter=False):
+    '''
+
+    :param m: object of DMRG class
+    :param seed: seed state (np.ndarray)
+    :param maxiter: max number of iterations (int)
+    :param tol:
+    :param use_seed:
+    :param force_maxiter:
+    :return:
+    '''
     x1 = seed
     x2 = seed
     gs = seed
@@ -50,9 +60,7 @@ def lanczos(m, seed, maxiter, tol, use_seed=False, force_maxiter=False):
     if (use_seed):
         x1 = seed
     else:
-        for i in range(x1.shape[0]):
-            for j in range(x1.shape[1]):
-                x1[i, j] = (2 * np.random.random() - 1.)
+        x1 = np.array([[(2 * np.random.random() - 1.) for j in range(x1.shape[1])] for j in range(x1.shape[0])])
 
     #    x1[:,:] = 1
     b[0] = np.matrix(x1**2).sum()
