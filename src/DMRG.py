@@ -63,10 +63,10 @@ def lanczos(m=None, seed=None, maxiter=1000, tol=1, use_seed=False, force_maxite
         x1 = np.array([[(2 * np.random.random() - 1.) for j in range(x1.shape[1])] for j in range(x1.shape[0])])
 
     #    x1[:,:] = 1
-    b[0] = np.matrix(x1**2).sum()
-    b[0] = np.sqrt(b[0])
+    b[0] = np.sqrt(np.tensordot(x1,x1))
+    # b[0] = np.sqrt(b[0])
     x1 = x1 / b[0]
-    x2[:] = 0
+    # x2[:] = 0
     b[0] = 1.
 
     e0 = 9999
@@ -82,14 +82,18 @@ def lanczos(m=None, seed=None, maxiter=1000, tol=1, use_seed=False, force_maxite
         aux = m.product(x2)
 
         x1 = x1 + aux
-        a[iter] = np.matrix(x1**x2).sum()
+        x1 = np.real(x1)
+        x2 = np.real(x2)
+        # a[iter] = np.matrix(x1*x2).sum()
+        a[iter] = np.tensordot(x1,x2)
         x1 = x1 - x2 * a[iter]
 
-        b[iter] = np.matrix(x1**2).sum()
-        b[iter] = np.sqrt(b[iter])
+        # b[iter] = np.matrix(x1**2).sum()
+        # b[iter] = np.sqrt(b[iter])
+        b[iter] = np.tensordot(x1, x1)
         lvectors.append(x2)
         #        print "Iter =",iter,a[iter],b[iter]
-        z.resize((iter, iter), refcheck=False)
+        z.resize((iter, iter), refcheck=False)  # Redeclare this as z = np.zeros((iter, iter), dtype=float)
         z[:, :] = 0
         for i in range(0, iter - 1):
             z[i, i + 1] = b[i + 1]
@@ -114,9 +118,10 @@ def lanczos(m=None, seed=None, maxiter=1000, tol=1, use_seed=False, force_maxite
                 ((not force_maxiter) and abs(eini - e0) <= tol)):
             # converged
             gs[:, :] = 0.
+            # gs += [v[nn, col] * lvectors[n] for nn in range(0, iter)]
             for n in range(0, iter):
-                gs += v[n, col] * lvectors[n]
-
+                # gs += v[n, col] * lvectors[n]
+                gs = np.add(gs, v[n, col]*lvectors[n], casting="unsafe")
             # print("E0 = ", e0)
             maxiter = iter
             return (e0, gs)  # We return with ground states energy
@@ -209,7 +214,8 @@ class DMRG(object):
     def ground_state(self):
         self.dim_l = self.HL[self.left_size].shape[0]
         self.dim_r = self.HR[self.right_size].shape[0]
-        self.psi.resize((self.dim_l, self.dim_r), refcheck=False)
+        # self.psi.resize((self.dim_l, self.dim_r), refcheck=False)
+        self.psi = np.resize(self.psi, (self.dim_l, self.dim_r))
         maxiter = self.dim_l*self.dim_r
         (self.energy, self.psi) = lanczos(self, self.psi, maxiter, 1.e-7)
         # (self.energy, self.psi) = np.linalg.eigh(self.psi)
