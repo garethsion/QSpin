@@ -9,13 +9,6 @@ DTYPE = np.double
 
 ctypedef np.double_t DTYPE_t
 
-cpdef psi_dot_psi(np.ndarray psi1, np.ndarray psi2):
-    cdef double x = 0.
-    for i in range(psi1.shape[0]):
-        for j in range(psi2.shape[1]):
-            x += psi1[i, j] * psi2[i, j]
-    return x
-
 cpdef lanczos(m, seed, int maxiter, double tol, bint use_seed=False, bint force_maxiter=False):
     cdef np.ndarray x1 = seed
     cdef np.ndarray x2 = seed
@@ -44,13 +37,12 @@ cpdef lanczos(m, seed, int maxiter, double tol, bint use_seed=False, bint force_
     if (use_seed):
         x1 = seed
     else:
+        #x1 = [[ (2 * np.random.random() - 1.) for j in range(x1.shape[1]) ] for i in range(x1.shape[0])]
         for i in range(x1.shape[0]):
             for j in range(x1.shape[1]):
                 x1[i, j] = (2 * np.random.random() - 1.)
 
-    #    x1[:,:] = 1
-    b[0] = psi_dot_psi(x1, x1)
-    b[0] = np.sqrt(b[0])
+    b[0] = np.sqrt(float(np.tensordot(x1, x1)))
     x1 = x1 / b[0]
     x2[:] = 0
     b[0] = 1.
@@ -68,13 +60,11 @@ cpdef lanczos(m, seed, int maxiter, double tol, bint use_seed=False, bint force_
         aux = m.product(x2)
 
         x1 = x1 + aux
-        a[iter] = psi_dot_psi(x1, x2)
+        a[iter] = float(np.tensordot(x1,x2))
         x1 = x1 - x2 * a[iter]
 
-        b[iter] = psi_dot_psi(x1, x1)
-        b[iter] = np.sqrt(b[iter])
+        b[iter] = np.sqrt(float(np.tensordot(x1,x1)))
         lvectors.append(x2)
-        #        print "Iter =",iter,a[iter],b[iter]
         z.resize((iter, iter), refcheck=False)
         z[:, :] = 0
         for i in range(0, iter - 1):
@@ -94,7 +84,6 @@ cpdef lanczos(m, seed, int maxiter, double tol, bint use_seed=False, bint force_
             n += 1
         e0 = d[col]
 
-        # print("Iter = ",iter," Ener = ",e0)
         if ((force_maxiter and iter >= control_max) or (
                 iter >= gs.shape[0] * gs.shape[1] or iter == 99 or abs(b[iter]) < tol) or \
                 ((not force_maxiter) and abs(eini - e0) <= tol)):
@@ -103,7 +92,6 @@ cpdef lanczos(m, seed, int maxiter, double tol, bint use_seed=False, bint force_
             for n in range(0, iter):
                 gs += v[n, col] * lvectors[n]
 
-            # print("E0 = ", e0)
             maxiter = iter
             return (e0, gs)  # We return with ground states energy
 
