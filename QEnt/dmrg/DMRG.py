@@ -34,6 +34,23 @@ class DMRGHamiltonians(Hamiltonians):
                       0.5 * np.kron(self.splus, splusRL[size - 1].transpose())
         return H[size]
 
+    def xy_hamiltonian(self, H, J=1, B=0, gamma=0, side='left', size=0, dim=0, splusRL=0, szRL=0):
+        if side == 'left':
+            H[size] = np.kron(H[size - 1], np.eye(2)) + \
+                      0.5*J * np.kron(splusRL[size - 1], self.splus.transpose()) + \
+                      0.5*J * np.kron(splusRL[size - 1].transpose(), self.splus) +\
+                      0.5*J*gamma( np.kron(splusRL[size - 1], self.splus) +\
+                                   np.kron(splusRL[size - 1].transpose(), self.splus.transpose())) -\
+                      B * np.kron(self.sz, szRL[size - 1])
+        elif side == 'right':
+            H[size] = np.kron(np.eye(2), H[size - 1]) + \
+                      0.5 * J * np.kron(splusRL[size - 1], self.splus.transpose()) + \
+                      0.5 * J * np.kron(splusRL[size - 1].transpose(), self.splus) + \
+                      0.5 * J * gamma(np.kron(splusRL[size - 1], self.splus) + \
+                                      np.kron(splusRL[size - 1].transpose(), self.splus.transpose())) - \
+                      B*np.kron(self.sz, szRL[size - 1])
+        return H[size]
+
 
 class Position:
     LEFT, RIGHT = range(2)
@@ -86,6 +103,8 @@ class DMRG(object):
         # print("Appending to HL index {:d}".format(self.left_size))
         self.HL[self.left_size] = ham.heisenberg_interaction(self.HL, side='left', size=self.left_size,
                                                              dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
+        # self.HL[self.left_size] = ham.xy_hamiltonian(self.HL, side='left', size=self.left_size,
+        #                                                      dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
 
         self.splusL[self.left_size] = np.kron(np.eye(self.dim_l), self.splus0)
         self.szL[self.left_size] = np.kron(np.eye(self.dim_l), self.sz0)

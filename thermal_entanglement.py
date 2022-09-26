@@ -1,10 +1,9 @@
 import numpy as np
-from qutip import *
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from src.Hamiltonians import Hamiltonians
-from src.Entanglement import Entanglement
+from QEnt.spin_systems.Hamiltonians import Hamiltonians
+from QEnt.mbs.Entanglement import Entanglement
 
 mpl.rcParams['figure.figsize'] = (10,6)
 mpl.rcParams['figure.frameon'] = True

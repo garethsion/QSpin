@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from src.Hamiltonians import Hamiltonians
+from QEnt.spin_systems.Hamiltonians import Hamiltonians
 
 
 class TestHamiltonians(unittest.TestCase):

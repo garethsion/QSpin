@@ -1,4 +1,4 @@
-from src.DMRG import Position, DMRG
+from QEnt.dmrg.DMRG import DMRG
 from functools import wraps
 import time
 
@@ -16,8 +16,8 @@ def timeit(func):
 
 @timeit
 def run_dmrg_heisenberg():
-    nsites = 300
-    n_states_to_keep = 300
+    nsites = 4
+    n_states_to_keep = 4
     n_sweeps = 6
     S = DMRG(nsites, n_sweeps, n_states_to_keep)
     rho = S.get_density()

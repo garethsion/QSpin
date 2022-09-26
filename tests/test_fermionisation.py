@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from src.Fermionisation import JordanWigner
+from QEnt.mbs.Fermionisation import JordanWigner
 
 
 class TestJordanWigner(unittest.TestCase):
