@@ -9,7 +9,7 @@ qent.egg-info/top_level.txt
 qent/dmrg/DMRG.py
 qent/dmrg/DMRG_Sparse.py
 qent/dmrg/__init__.py
-qent/dmrg/c_lanczos.c
+qent/dmrg/build/qent/dmrg/c_lanczos.c
 qent/mbs/Entanglement.py
 qent/mbs/Fermionisation.py
 qent/mbs/__init__.py

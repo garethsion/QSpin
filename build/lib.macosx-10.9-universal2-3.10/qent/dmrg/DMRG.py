@@ -12,7 +12,7 @@ from qent.spin_systems.Hamiltonians import Hamiltonians
 from tqdm import tqdm
 from numba import jit
 # from src.lanczos import lanczos
-from c_lanczos import lanczos
+from qent.dmrg.c_lanczos import lanczos
 
 class DMRGHamiltonians(Hamiltonians):
     def __init__(self):
