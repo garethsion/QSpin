@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse.linalg import eigs
 from qutip import *
-
+from qent.dmrg import DMRG
 
 class Entanglement:
     '''
@@ -18,6 +18,8 @@ class Entanglement:
         self.N = N
         self.num_spins = num_spins
         self.dims = self._hilbert_dims()
+        self.ene = []
+        self.vev = []
         pass
 
     def _hilbert_dims(self):
@@ -67,7 +69,22 @@ class Entanglement:
         GS = Vec[:,1]
         return Qobj(GS, type='Ket')
 
-    def thermal_state(self, H=[], T=1, K=1, trace_out_sys='b'):
+    @property
+    def energy(self):
+        return self.ene, self.vec
+
+    @energy.setter
+    def energy(self, method='normal', H=[], n_states_to_keep=100, n_sweeps=6):
+        if method == 'normal':
+            self.ene, self.vec = eigs(H)
+        elif method == 'dmrg':
+            S = DMRG(self.N, n_sweeps, n_states_to_keep)
+            self.ene, self.vec = S.ground_state()
+
+    def thermal_state(self, method='normal', H=[], T=1, K=1, trace_out_sys='b'):
+
+        if len(self.ene) == 0 or len(self.vec) == 0:
+            raise ValueError("The energy setter must be called before running this method")
 
         if trace_out_sys == 'a':
             dim1 = self.dims[1]
@@ -80,16 +97,15 @@ class Entanglement:
             dim2 = self.dims[1]
 
         beta = 1/(K*T)
-        ene, vec = eigs(H)
 
-        Z = np.sum(np.exp(-ene * beta))
-        prob = (1/Z) * np.exp(-ene * beta)
+        Z = np.sum(np.exp(-self.ene * beta))
+        prob = (1/Z) * np.exp(-self.ene * beta)
 
         thermal = np.zeros((dim1*dim2, dim1*dim2), dtype='float')
         thermal = Qobj(thermal, dims=[[dim1, dim2], [dim1, dim2]])
 
-        for num in range(0, len(ene)):
-            psi = Qobj(vec[:, num], type='ket')
+        for num in range(0, len(self.ene)):
+            psi = Qobj(self.vec[:, num], type='ket')
             rho = ket2dm(psi)
             rho_tr = self.get_partial_trace(rho=rho, trace_out_sys=trace_out_sys)
             thermal = thermal + prob[num]*rho_tr

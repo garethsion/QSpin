@@ -92,14 +92,13 @@ class DMRG(object):
         self.energy = 0
         self.error = 0
 
-    @jit(forceobj=True)
+    # @jit(forceobj=True)
     def build_block_left(self, it):
         self.left_size = it
         self.dim_l = self.HL[self.left_size-1].shape[0]
 
         # Enlarge left block
         ham = DMRGHamiltonians()
-        # print("Appending to HL index {:d}".format(self.left_size))
         self.HL[self.left_size] = ham.heisenberg_interaction(self.HL, side='left', size=self.left_size,
                                                              dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
         # self.HL[self.left_size] = ham.xy_hamiltonian(self.HL, side='left', size=self.left_size,
@@ -108,7 +107,7 @@ class DMRG(object):
         self.splusL[self.left_size] = np.kron(np.eye(self.dim_l), self.splus0)
         self.szL[self.left_size] = np.kron(np.eye(self.dim_l), self.sz0)
 
-    @jit(forceobj=True)
+    # @jit(forceobj=True)
     def build_block_right(self, it):
         self.right_size = it
         self.dim_r = self.HR[self.right_size - 1].shape[0]
@@ -118,7 +117,7 @@ class DMRG(object):
         self.splusR[self.right_size] = np.kron(self.splus0, np.eye(self.dim_r))
         self.szR[self.right_size] = np.kron(self.sz0, np.eye(self.dim_r))
 
-    @jit(forceobj=True)
+    # @jit(forceobj=True)
     def ground_state(self):
         self.dim_l = self.HL[self.left_size].shape[0]
         self.dim_r = self.HR[self.right_size].shape[0]
@@ -126,16 +125,15 @@ class DMRG(object):
         self.psi = np.resize(self.psi, (self.dim_l, self.dim_r))
         maxiter = self.dim_l*self.dim_r
         (self.energy, self.psi) = lanczos(self, self.psi, maxiter, 1.e-7)
-        # (self.energy, self.psi) = np.linalg.eigh(self.psi)
 
-    @jit(forceobj=True)
+    # @jit(forceobj=True)
     def density_matrix(self, position):
         if position == Position.LEFT:
             self.rho = np.dot(self.psi, self.psi.transpose())
         else:
             self.rho = np.dot(self.psi.transpose(), self.psi)
 
-    @jit(forceobj=True)
+    # @jit(forceobj=True)
     def truncate(self, position, m):
         # diagonalize rho
         rho_eig, rho_evec = scipy.sparse.linalg.eigsh(self.rho)
@@ -219,6 +217,10 @@ class DMRG(object):
                 self.density_matrix(Position.RIGHT)
                 self.truncate(Position.RIGHT, self.n_states_to_keep)
 
+    def build_superblock(self, lsites, rsites):
+        self.build_block_left(lsites)
+        self.build_block_right(rsites)
+
     def _finite_dmrg(self):
         first_iter = int(self.nsites / 2)
         for i in tqdm(range(1, self.n_sweeps)):
@@ -228,6 +230,7 @@ class DMRG(object):
                     # Create HL and HR by adding the single sites to the two blocks
                     self.build_block_left(i)
                     self.build_block_right(self.nsites - i - 2)
+                    # self.build_superblock(i, self.nsites-i-2)
                     # find smallest eigenvalue and eigenvector
                     self.ground_state()
                     # Calculate density matrix
@@ -240,6 +243,7 @@ class DMRG(object):
                     # Create HL and HR by adding the single sites to the two blocks
                     self.build_block_right(i)
                     self.build_block_left(self.nsites - i - 2)
+                    # self.build_superblock(i, self.nsites-i-2)
                     # find smallest eigenvalue and eigenvector
                     self.ground_state()
                     # Calculate density matrix
