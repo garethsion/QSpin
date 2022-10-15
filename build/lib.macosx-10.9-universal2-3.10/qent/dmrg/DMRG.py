@@ -14,6 +14,9 @@ from numba import jit
 # from src.lanczos import lanczos
 from qent.dmrg.c_lanczos import lanczos
 
+class IllegalArgumentError(ValueError):
+    pass
+
 class DMRGHamiltonians(Hamiltonians):
     def __init__(self):
         super().__init__()
@@ -92,6 +95,17 @@ class DMRG(object):
         self.energy = 0
         self.error = 0
 
+    @property
+    def hamiltonian(self):
+        return self.ham_select
+
+    @hamiltonian.setter
+    def hamiltonian(self, model):
+        models_list = ['heisenberg', 'xy']
+        if not model in models_list:
+            raise IllegalArgumentError('The selected Hamiltonian is either not currently supported, or there is a problem in its definition.')
+        self.ham_select = model
+
     # @jit(forceobj=True)
     def build_block_left(self, it):
         self.left_size = it
@@ -99,10 +113,20 @@ class DMRG(object):
 
         # Enlarge left block
         ham = DMRGHamiltonians()
-        self.HL[self.left_size] = ham.heisenberg_interaction(self.HL, side='left', size=self.left_size,
-                                                             dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
-        # self.HL[self.left_size] = ham.xy_hamiltonian(self.HL, side='left', size=self.left_size,
-        #                                                      dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
+
+        try:
+            ham_select = self.ham_select
+        except AttributeError:
+            print("The hamiltonian must first be set")
+
+        if ham_select == 'heisenberg':
+            self.HL[self.left_size] = ham.heisenberg_interaction(self.HL, side='left', size=self.left_size,
+                                                                 dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
+        elif ham_select == 'xy':
+            self.HL[self.left_size] = ham.xy_hamiltonian(self.HL, side='left', size=self.left_size,
+                                                         dim=self.dim_l, splusRL=self.splusL, szRL=self.szL)
+        else:
+            raise AttributeError("The Hamiltonian selected is not available")
 
         self.splusL[self.left_size] = np.kron(np.eye(self.dim_l), self.splus0)
         self.szL[self.left_size] = np.kron(np.eye(self.dim_l), self.sz0)
@@ -112,8 +136,21 @@ class DMRG(object):
         self.right_size = it
         self.dim_r = self.HR[self.right_size - 1].shape[0]
         ham = DMRGHamiltonians()
-        self.HR[self.right_size] = ham.heisenberg_interaction(self.HR, side='right', size=self.right_size,
-                                                             dim=self.dim_r, splusRL=self.splusR, szRL=self.szR)
+
+        try:
+            ham_select = self.ham_select
+        except AttributeError:
+            print("The hamiltonian must first be set")
+
+        if self.ham_select == 'heisenberg':
+            self.HR[self.right_size] = ham.heisenberg_interaction(self.HR, side='right', size=self.right_size,
+                                                                 dim=self.dim_r, splusRL=self.splusR, szRL=self.szR)
+        elif self.ham_select == 'xy':
+            self.HR[self.right_size] = ham.xy_hamiltonian(self.HR, side='right', size=self.right_size,
+                                                                  dim=self.dim_r, splusRL=self.splusR, szRL=self.szR)
+        else:
+            raise AttributeError("The Hamiltonian selected is not available")
+
         self.splusR[self.right_size] = np.kron(self.splus0, np.eye(self.dim_r))
         self.szR[self.right_size] = np.kron(self.sz0, np.eye(self.dim_r))
 
@@ -256,3 +293,8 @@ class DMRG(object):
         self._infinite_dmrg()
         self._finite_dmrg()
         return self.rho
+
+    def get_energy(self):
+        self._infinite_dmrg()
+        self._finite_dmrg()
+        return self.energy, self.psi

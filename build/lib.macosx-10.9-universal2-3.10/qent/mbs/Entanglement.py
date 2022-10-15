@@ -3,6 +3,9 @@ from scipy.sparse.linalg import eigs
 from qutip import *
 from qent.dmrg import DMRG
 
+class IllegalArgumentError(ValueError):
+    pass
+
 class Entanglement:
     '''
         The Entanglement class provides methods for calculating the bipartite and multipartite entanglement for a given
@@ -22,7 +25,7 @@ class Entanglement:
         self.vev = []
         pass
 
-    def _hilbert_dims(self):
+    def _hilbert_dims(self) -> list:
         '''
             Returns the Hilbert space dimensions for a state of a given number of spins.
         :return: list of dimensions
@@ -48,7 +51,7 @@ class Entanglement:
         elif trace_out_sys == 'c':
             return rho.ptrace([0, 1])
 
-    def tracenorm(self, rho=[]):
+    def tracenorm(self, rho=[]) -> float:
         '''
             Calculates the singular value decomposition of a given density matrix
 
@@ -61,30 +64,60 @@ class Entanglement:
     def get_partial_transpose(self, rho=None, mask=[1, 0], method="sparse"):
         return partial_transpose(rho, mask, method=method)
 
-    def negativity(self, rho=None):
+    def negativity(self, rho=None) -> float:
         return self.tracenorm(rho)-1
     
-    def ground_state(self, H=[]):
+    def ground_state(self, H=[]) -> Qobj:
         Ene, Vec = eigs(H)
         GS = Vec[:,1]
         return Qobj(GS, type='Ket')
 
-    @property
-    def energy(self):
-        return self.ene, self.vec
-
-    @energy.setter
-    def energy(self, method='normal', H=[], n_states_to_keep=100, n_sweeps=6):
+    def energy(self, method='normal', H=[]) -> None:
         if method == 'normal':
             self.ene, self.vec = eigs(H)
         elif method == 'dmrg':
-            S = DMRG(self.N, n_sweeps, n_states_to_keep)
-            self.ene, self.vec = S.ground_state()
+            S = DMRG.DMRG(self.N, self.num_sweeps, self.n_states)
+            S.hamiltonian = self.ham_select
+            self.ene, self.vec = S.get_energy()
+        return self.ene, self.vec
 
-    def thermal_state(self, method='normal', H=[], T=1, K=1, trace_out_sys='b'):
+    @property
+    def n_states_to_keep(self):
+        return self.n_states
 
-        if len(self.ene) == 0 or len(self.vec) == 0:
-            raise ValueError("The energy setter must be called before running this method")
+    @n_states_to_keep.setter
+    def n_states_to_keep(self, n=100):
+        assert isinstance(n, int), "The number of states must be a positive integer value"
+        assert n > 0, "The number of states must be a positive integer value"
+        self.n_states = n
+
+    @property
+    def n_sweeps(self):
+        return self.num_sweeps
+
+    @n_sweeps.setter
+    def n_sweeps(self, n=6):
+        assert isinstance(n, int), "The number of sweeps must be a positive integer value"
+        assert n > 0, "The number of sweeps must be a positive integer value"
+        self.num_sweeps = n
+
+    @property
+    def hamiltonian(self):
+        return self.ham_select
+
+    @hamiltonian.setter
+    def hamiltonian(self, model):
+        models_list = ['heisenberg', 'xy']
+        if not model in models_list:
+            raise IllegalArgumentError(
+                'The selected Hamiltonian is either not currently supported, or there is a problem in its definition.')
+        self.ham_select = model
+
+    def thermal_state(self, method='normal', T=1, K=1, trace_out_sys='b'):
+
+        # if len(self.ene) == 0 or len(self.vec) == 0:
+        #     raise ValueError("The energy setter must be called before running this method")
+        self.ene, self.vec = self.energy(method='dmrg')
 
         if trace_out_sys == 'a':
             dim1 = self.dims[1]
